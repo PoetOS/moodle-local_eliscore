@@ -480,7 +480,7 @@ function manual_field_add_help_button($mform, $elementname, $field) {
         //$mform->addElement('static', $elementname .'_help',
         $mform->addElement('html', '<div class="'.$divclass.'"><div class="fitemtitle"><label for="id_'.$elementname.
                 '"><span class="helptooltip"><a href="'.$url.'" title="'.$heading.'" id="'.$id.'" target="_blank" aria-haspopup="true"><img src="'.
-                $OUTPUT->pix_url('help').'" alt="'.$heading.'" title="'.$heading.'" class="iconhelp"></a></span>&nbsp;</label></div></div>'
+                $OUTPUT->image_url('help').'" alt="'.$heading.'" title="'.$heading.'" class="iconhelp"></a></span>&nbsp;</label></div></div>'
         );
     }
 }

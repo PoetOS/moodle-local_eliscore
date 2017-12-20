@@ -97,9 +97,9 @@ class elis_custom_field_multiselect extends MoodleQuickForm_group {
 
         $options = array(
             'id' => $id,
-            'up' => $OUTPUT->pix_url('t/up')->out(false),
-            'down' => $OUTPUT->pix_url('t/down')->out(false),
-            'del' => $OUTPUT->pix_url('t/delete')->out(false),
+            'up' => $OUTPUT->image_url('t/up')->out(false),
+            'down' => $OUTPUT->image_url('t/down')->out(false),
+            'del' => $OUTPUT->image_url('t/delete')->out(false),
         );
         $fields = field::get_for_context_level($this->_options['contextlevel']);
         $fieldsbycategory = array();

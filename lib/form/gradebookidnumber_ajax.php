@@ -101,7 +101,7 @@ if ($mode != 'gradebook') {
     if ($items->valid()) {
         echo html_writer::start_tag('ul');
         foreach ($items as $item) {
-            $item->icon = $OUTPUT->pix_url('icon', 'mod_'.$item->itemmodule);
+            $item->icon = $OUTPUT->image_url('icon', 'mod_'.$item->itemmodule);
             print_item($item);
         }
         echo html_writer::end_tag('ul');
@@ -122,13 +122,13 @@ if ($mode != 'gradebook') {
         foreach ($items as $item) {
             switch ($item->itemtype) {
                 case 'category':
-                    $item->icon = $OUTPUT->pix_url('f/folder');
+                    $item->icon = $OUTPUT->image_url('f/folder');
                     break;
                 case 'manual':
-                    $item->icon = $OUTPUT->pix_url('t/manual_item');
+                    $item->icon = $OUTPUT->image_url('t/manual_item');
                     break;
                 default:
-                    $item->icon = $OUTPUT->pix_url('f/unknown');
+                    $item->icon = $OUTPUT->image_url('f/unknown');
             }
             print_item($item);
         }

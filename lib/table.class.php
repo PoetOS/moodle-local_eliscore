@@ -108,13 +108,13 @@ class display_table {
                                                             array($this->sort_param => $columnid,
                                                                   $this->sortdir_param => self::DESC)),
                                              $column['header'])
-                        . ' ' . html_writer::empty_tag('img', array('src' => $OUTPUT->pix_url('t/down')));
+                        . ' ' . html_writer::empty_tag('img', array('src' => $OUTPUT->image_url('t/down')));
                 } else if ($column['sortable'] === self::DESC) {
                     return html_writer::link(new moodle_url($this->base_url,
                                                             array($this->sort_param => $columnid,
                                                                   $this->sortdir_param => self::ASC)),
                                              $column['header'])
-                        . ' ' . html_writer::empty_tag('img', array('src' => $OUTPUT->pix_url('t/up')));
+                        . ' ' . html_writer::empty_tag('img', array('src' => $OUTPUT->image_url('t/up')));
                 } else {
                     return $column['header'];
                 }
