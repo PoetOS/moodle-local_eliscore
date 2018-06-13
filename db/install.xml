@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<XMLDB PATH="elis/core/db" VERSION="20110216" COMMENT="XMLDB file for common ELIS database tables"
+<XMLDB PATH="local/eliscore/db" VERSION="20110216" COMMENT="XMLDB file for common ELIS database tables"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:noNamespaceSchemaLocation="../../../lib/xmldb/xmldb.xsd"
 >
