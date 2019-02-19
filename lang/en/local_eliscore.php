@@ -373,3 +373,31 @@ $string['form_period_error'] = 'Schedule period must be of form: *d*h*m and grea
 $string['form_period_help'] = 'This setting controls how often the schedule job is run. Values can be entered in the form \*d\*h\*m to represent days, hours, and minutes. Please set this value to five minutes or longer to allow ample time for processing.';
 
 $string['required_field'] = 'Error: {$a} is a required field';
+
+// Privacy API strings.
+$string['privacy:metadata:local_eliscore_wkflow_inst'] = 'Data about in-progress workflows.';
+$string['privacy:metadata:local_eliscore_wkflow_inst:userid'] = 'The user that the workflow instance belongs to.';
+$string['privacy:metadata:local_eliscore_wkflow_inst:type'] = 'The type of workflow.';
+$string['privacy:metadata:local_eliscore_wkflow_inst:subtype'] = 'The sub-type of the workflow.';
+$string['privacy:metadata:local_eliscore_wkflow_inst:data'] = 'The workflow\'s current state data.';
+$string['privacy:metadata:local_eliscore_wkflow_inst:timemodified'] = 'Date and time of last record modification.';
+
+$string['privacy:metadata:local_eliscore_fld_data_text'] = 'Custom field data for (long) textual data types.';
+$string['privacy:metadata:local_eliscore_fld_data_text:contextid'] = 'The user id associated with this field data.';
+$string['privacy:metadata:local_eliscore_fld_data_text:fieldid'] = 'The field id defining this field data.';
+$string['privacy:metadata:local_eliscore_fld_data_text:data'] = 'The actual data assigned to this user.';
+
+$string['privacy:metadata:local_eliscore_fld_data_int'] = 'Custom field data for integer data types.';
+$string['privacy:metadata:local_eliscore_fld_data_int:contextid'] = 'The user id associated with this field data.';
+$string['privacy:metadata:local_eliscore_fld_data_int:fieldid'] = 'The field id defining this field data.';
+$string['privacy:metadata:local_eliscore_fld_data_int:data'] = 'The actual data assigned to this user.';
+
+$string['privacy:metadata:local_eliscore_fld_data_num'] = 'Custom field data for numeric data types.';
+$string['privacy:metadata:local_eliscore_fld_data_num:contextid'] = 'The user id associated with this field data.';
+$string['privacy:metadata:local_eliscore_fld_data_num:fieldid'] = 'The field id defining this field data.';
+$string['privacy:metadata:local_eliscore_fld_data_num:data'] = 'The actual data assigned to this user.';
+
+$string['privacy:metadata:local_eliscore_fld_data_char'] = 'Custom field data for character data types.';
+$string['privacy:metadata:local_eliscore_fld_data_char:contextid'] = 'The user id associated with this field data.';
+$string['privacy:metadata:local_eliscore_fld_data_char:fieldid'] = 'The field id defining this field data.';
+$string['privacy:metadata:local_eliscore_fld_data_char:data'] = 'The actual data assigned to this user.';
