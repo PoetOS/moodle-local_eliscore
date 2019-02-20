@@ -27,6 +27,11 @@ namespace local_eliscore\privacy;
 
 defined('MOODLE_INTERNAL') || die();
 
+// Need this constant, and there seems to be no way to ensure it's available. This is a potential problem area.
+if (!defined('CONTEXT_ELIS_USER')) {
+    define('CONTEXT_ELIS_USER', 15);
+}
+
 class provider implements
     // This plugin has data.
     \core_privacy\local\metadata\provider,
@@ -91,37 +96,11 @@ class provider implements
     public static function get_contexts_for_userid(int $userid): \core_privacy\local\request\contextlist {
         global $DB;
 
-        // Need this constant, and there seems to be no way to ensure its available. This is a potential problem area.
-        if (!defined('CONTEXT_ELIS_USER')) {
-            define('CONTEXT_ELIS_USER', 15);
-        }
-
         $contextlist = new \core_privacy\local\request\contextlist();
 
         // If the user exists in any of the ELIS core tables, add the user context and return it.
-        if ($DB->record_exists('local_eliscore_wkflow_inst', ['userid' => $userid])) {
+        if (self::user_has_eliscore_data($userid)) {
             $contextlist->add_user_context($userid);
-        } else {
-            $tables = ['local_eliscore_fld_data_text', 'local_eliscore_fld_data_int',
-                'local_eliscore_fld_data_num', 'local_eliscore_fld_data_char'];
-            $select = 'SELECT ecfd.id ';
-            $conditions = 'INNER JOIN {local_eliscore_field} ecf ON ecfd.fieldid = ecf.id ' .
-                'INNER JOIN {local_eliscore_fld_cat_ctx} ecfc ON ecf.categoryid = ecfc.categoryid AND ' .
-                    'ecfc.contextlevel = :usercontext1 ' .
-                'INNER JOIN {user} u ON u.id = :userid ' .
-                'INNER JOIN {local_elisprogram_usr} epu ON u.idnumber = epu.idnumber ' .
-                'INNER JOIN {context} c ON epu.id = c.instanceid AND c.contextlevel = :usercontext2 ' .
-                'WHERE c.id = ecfd.contextid';
-            $params = ['userid' => $userid, 'usercontext1' => CONTEXT_ELIS_USER, 'usercontext2' => CONTEXT_ELIS_USER];
-
-            foreach ($tables as $table) {
-                $from = 'FROM {' . $table . '} ecfd ';
-                $sql = $select . $from . $conditions;
-                if (!empty($DB->get_field_sql($sql, $params))) {
-                    $contextlist->add_user_context($userid);
-                    break;
-                }
-            }
         }
 
         return $contextlist;
@@ -136,20 +115,14 @@ class provider implements
     public static function get_users_in_context(\core_privacy\local\request\userlist $userlist) {
 
         $context = $userlist->get_context();
-        if (!$context instanceof \context_module) {
+        if (!$context instanceof \context_user) {
             return;
         }
 
-        $params = ['modulename' => 'kronossandvm', 'instanceid' => $context->instanceid];
-
-        // Kronossandvm user requests.
-        $sql = "SELECT kr.userid
-              FROM {course_modules} cm
-              JOIN {modules} m ON m.id = cm.module AND m.name = :modulename
-              JOIN {kronossandvm} k ON k.id = cm.instance
-              JOIN {kronossandvm_requests} kr ON kr.vmid = k.id
-             WHERE cm.id = :instanceid";
-        $userlist->add_from_sql('userid', $sql, $params);
+        // If the user exists in any of the ELIS core tables, add the user context and return it.
+        if (self::user_has_eliscore_data($context->instanceid)) {
+            $userlist->add_user($context->instanceid);
+        }
     }
 
     /**
@@ -164,76 +137,34 @@ class provider implements
             return;
         }
 
+        // Export ELIS core data.
+        $data = new \stdClass();
+        $data->workflows = [];
+        $data->elisfields = [];
         $user = $contextlist->get_user();
+        $context = \context_user::instance($user->id);
 
-        list($contextsql, $contextparams) = $DB->get_in_or_equal($contextlist->get_contextids(), SQL_PARAMS_NAMED);
-
-        // This will only work for get_recordset. If get_records is used, a different first field will be needed.
-        $sql = "SELECT cm.id AS cmid,
-                       kr.*
-                  FROM {context} c
-            INNER JOIN {course_modules} cm ON cm.id = c.instanceid AND c.contextlevel = :contextlevel
-            INNER JOIN {modules} m ON m.id = cm.module AND m.name = :modname
-            INNER JOIN {kronossandvm} k ON k.id = cm.instance
-            INNER JOIN {kronossandvm_requests} kr ON kr.vmid = k.id
-                 WHERE c.id {$contextsql}
-                       AND kr.userid = :userid
-              ORDER BY cm.id";
-
-        $params = ['modname' => 'kronossandvm', 'contextlevel' => CONTEXT_MODULE, 'userid' => $user->id] + $contextparams;
-
-        // Reference to the activity seen in the last iteration of the loop. By comparing this with the current record, and
-        // because we know the results are ordered, we know when we've moved to the requests for a new activity and therefore
-        // when we can export the complete data for the last activity.
-        $lastcmid = null;
-        $requestdata = [];
-
-        $requests = $DB->get_recordset_sql($sql, $params);
-        foreach ($requests as $request) {
-            // If we've moved to a new activity, then write the last activity data and reinit the activity data array.
-            if ($lastcmid != $request->cmid) {
-                if (!empty($requestdata)) {
-                    $context = \context_module::instance($lastcmid);
-                    self::export_request_data_for_user($requestdata, $context, $user);
-                }
-                $requestdata = [];
-                $lastcmid = $request->cmid;
-            }
-            $requestdata['requests'][] = [
-                'requesttime' => \core_privacy\local\request\transform::datetime($request->requesttime),
-                'starttime' => \core_privacy\local\request\transform::datetime($request->starttime),
-                'endtime' => \core_privacy\local\request\transform::datetime($request->endtime),
-                'instanceid' => $request->instanceid,
-                'instanceip' => $request->instanceip,
-                'isscript' => $request->isscript,
-                'username' => $request->username,
-                'password' => $request->password,
-                'isactive' => $request->isactive,
+        $workflowdata = self::user_workflow_data($user->id);
+        foreach ($workflowdata as $workflow) {
+            $data->workflows[] = [
+                'type' => $workflow->type,
+                'subtype' => $workflow->subtype,
+                'data' => $workflow->data,
+                'timemodified' => \core_privacy\local\request\transform::datetime($workflow->timemodified),
             ];
         }
-        $requests->close();
 
-        // The data for the last activity won't have been written yet, so make sure to write it now!
-        if (!empty($requestdata)) {
-            $context = \context_module::instance($lastcmid);
-            self::export_request_data_for_user($requestdata, $context, $user);
+        $elisfieldsdata = self::user_field_data($user->id);
+        foreach ($elisfieldsdata as $elisfield) {
+            $data->elisfields[] = [
+                'name' => $elisfield->name,
+                'data' => $elisfield->data,
+            ];
         }
-    }
 
-    /**
-     * Export the supplied personal data for a single request.
-     *
-     * @param array $requestdata the personal data to export for the request.
-     * @param \context_module $context the context of the request.
-     * @param \stdClass $user the user record
-     */
-    protected static function export_request_data_for_user(array $requestdata, \context_module $context, \stdClass $user) {
-        // Fetch the generic module data for the activity.
-        $contextdata = \core_privacy\local\request\helper::get_context_data($context, $user);
-
-        // Merge with activity data and write it.
-        $contextdata = (object)array_merge((array)$contextdata, $requestdata);
-        \core_privacy\local\request\writer::with_context($context)->export_data([], $contextdata);
+        \core_privacy\local\request\writer::with_context($context)->export_data([
+            get_string('privacy:metadata:local_eliscore', 'local_eliscore')
+        ], $data);
     }
 
     /**
@@ -244,7 +175,7 @@ class provider implements
     public static function delete_data_for_all_users_in_context(\context $context) {
         global $DB;
 
-        if ($context->contextlevel == CONTEXT_MODULE) {
+        if ($context->contextlevel == CONTEXT_USER) {
             // Delete all user request data for the activity context.
             if ($cm = get_coursemodule_from_id('kronossandvm', $context->instanceid)) {
                 $DB->delete_records('kronossandvm_requests', ['vmid' => $cm->instance]);
@@ -296,5 +227,69 @@ class provider implements
             $params = ['vmid' => $cm->instance] + $userparams;
             $DB->delete_records_select('kronossandvm_requests', $select, $params);
         }
+    }
+
+    /**
+     * Return true if the specified userid has data in the ELIS core tables.
+     *
+     * @param int $userid The user to check for.
+     * @return boolean
+     */
+    private static function user_has_eliscore_data(int $userid) {
+        global $DB;
+
+        $hasdata = false;
+        if (!empty(self::user_workflow_data($userid))) {
+            $hasdata = true;
+        } else if (!empty(self::user_field_data($userid))) {
+            $hasdata = true;
+        }
+
+        return $hasdata;
+    }
+
+    /**
+     * Return the workflow record for the specified user.
+     *
+     * @param int $userid The user to check for.
+     * @return stdClass The data or empty record.
+     */
+    private static function user_workflow_data(int $userid) {
+        global $DB;
+
+        return $DB->get_records('local_eliscore_wkflow_inst', ['userid' => $userid]);
+    }
+
+    /**
+     * Return the ELIS core field records for the specified user.
+     *
+     * @param int $userid The user to check for.
+     * @return stdClass The data or empty record.
+     */
+    private static function user_field_data(int $userid) {
+        global $DB;
+
+        $data = [];
+        $tables = ['local_eliscore_fld_data_text', 'local_eliscore_fld_data_int',
+            'local_eliscore_fld_data_num', 'local_eliscore_fld_data_char'];
+        $select = 'SELECT ecfd.id, ecf.id as fieldid, ecf.name, ecfd.data ';
+        $conditions = 'INNER JOIN {local_eliscore_field} ecf ON ecfd.fieldid = ecf.id ' .
+            'INNER JOIN {local_eliscore_fld_cat_ctx} ecfc ON ecf.categoryid = ecfc.categoryid AND ' .
+            'ecfc.contextlevel = :usercontext1 ' .
+            'INNER JOIN {user} u ON u.id = :userid ' .
+            'INNER JOIN {local_elisprogram_usr} epu ON u.idnumber = epu.idnumber ' .
+            'INNER JOIN {context} c ON epu.id = c.instanceid AND c.contextlevel = :usercontext2 ' .
+            'WHERE c.id = ecfd.contextid';
+        $params = ['userid' => $userid, 'usercontext1' => CONTEXT_ELIS_USER, 'usercontext2' => CONTEXT_ELIS_USER];
+
+        foreach ($tables as $table) {
+            $from = 'FROM {' . $table . '} ecfd ';
+            $sql = $select . $from . $conditions;
+            if (!empty($records = $DB->get_records_sql($sql, $params))) {
+                $data = array_merge($data, $records);
+            }
+        }
+
+        return $data;
     }
 }

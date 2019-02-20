@@ -41,6 +41,11 @@ class local_eliscore_privacy_testcase extends \core_privacy\tests\provider_testc
      * Tests set up.
      */
     public function setUp() {
+        // Need this constant, and there seems to be no way to ensure its available. This is a potential problem area.
+        if (!defined('CONTEXT_ELIS_USER')) {
+            define('CONTEXT_ELIS_USER', 15);
+        }
+
         $this->resetAfterTest();
         $this->setAdminUser();
     }
@@ -49,29 +54,16 @@ class local_eliscore_privacy_testcase extends \core_privacy\tests\provider_testc
      * Check that a user context is returned if there is any user data for this user.
      */
     public function test_get_contexts_for_userid() {
-        global $DB;
+        $this->resetAfterTest();
 
-        // Need this constant, and there seems to be no way to ensure its available. This is a potential problem area.
-        if (!defined('CONTEXT_ELIS_USER')) {
-            define('CONTEXT_ELIS_USER', 15);
-        }
-
-        $user1 = $this->getDataGenerator()->create_user();
-        $user2 = $this->getDataGenerator()->create_user();
-        // Trigger the user created event so ELIS will create its user records.
-        \core\event\user_created::create_from_userid($user1->id)->trigger();
-        \core\event\user_created::create_from_userid($user2->id)->trigger();
-        // The events will have updated the user records. Reload them.
-        $user1 = $DB->get_record('user', ['id' => $user1->id]);
-        $user2 = $DB->get_record('user', ['id' => $user2->id]);
+        $user1 = self::create_elis_user($this->getDataGenerator());
+        $user2 = self::create_elis_user($this->getDataGenerator());
 
         $this->assertEmpty(provider::get_contexts_for_userid($user1->id));
         $this->assertEmpty(provider::get_contexts_for_userid($user2->id));
 
         // Create a workflow instance.
-        $record = (object)['type' => 'Type text', 'subtype' => 'Subtype text.', 'userid' => $user1->id,
-            'data' => 'This is the data.', 'timemodified' => time()];
-        $DB->insert_record('local_eliscore_wkflow_inst', $record);
+        self::create_workflow_instance($user1->id);
 
         $contextlist = provider::get_contexts_for_userid($user1->id);
         // Check that we only get back one context.
@@ -81,17 +73,16 @@ class local_eliscore_privacy_testcase extends \core_privacy\tests\provider_testc
         $usercontext = \context_user::instance($user1->id);
         $this->assertEquals($usercontext->id, $contextlist->get_contextids()[0]);
 
-        // Create an ELIS user field associated to user2.
-        $elisuserid = $DB->get_field('local_elisprogram_usr', 'id', ['idnumber' => $user2->idnumber]);
-        $contextid = $DB->get_field('context', 'id', ['contextlevel' => CONTEXT_ELIS_USER, 'instanceid' => $elisuserid]);
-        $record = (object)['name' => 'Test category'];
-        $categoryid = $DB->insert_record('local_eliscore_field_cats', $record);
-        $record = (object)['categoryid' => $categoryid, 'contextlevel' => CONTEXT_ELIS_USER];
-        $DB->insert_record('local_eliscore_fld_cat_ctx', $record);
-        $record = (object)['shortname' => 'testfield', 'name' => 'Test Field', 'datatype' => 'text', 'categoryid' => $categoryid];
-        $fieldid = $DB->insert_record('local_eliscore_field', $record);
-        $record = (object)['contextid' => $contextid, 'fieldid' => $fieldid, 'data' => 'Test user data.'];
-        $DB->insert_record('local_eliscore_fld_data_text', $record);
+        // Create an ELIS user field associated to user1.
+        self::create_elis_user_field($user1->idnumber);
+
+        // Vaerify that user2 still have no context data.
+        $this->assertEmpty(provider::get_contexts_for_userid($user2->id));
+
+        // Create some ELIS user field associated to user2.
+        self::create_elis_user_field($user2->idnumber);
+        self::create_elis_user_field($user2->idnumber);
+        self::create_elis_user_field($user2->idnumber);
 
         $contextlist = provider::get_contexts_for_userid($user2->id);
         // Check that we only get back one context.
@@ -100,7 +91,6 @@ class local_eliscore_privacy_testcase extends \core_privacy\tests\provider_testc
         // Check that a context is returned and is the expected context.
         $usercontext = \context_user::instance($user2->id);
         $this->assertEquals($usercontext->id, $contextlist->get_contextids()[0]);
-
     }
 
     /**
@@ -108,25 +98,28 @@ class local_eliscore_privacy_testcase extends \core_privacy\tests\provider_testc
      */
     public function test_get_users_in_context() {
         $this->resetAfterTest();
-return;
 
-        $component = 'auth_kronosportal';
-        // Create a user.
-        $user = $this->getDataGenerator()->create_user();
-        $usercontext = context_user::instance($user->id);
+        $component = 'local_eliscore';
+        // Create some users.
+        $user1 = self::create_elis_user($this->getDataGenerator());
+        $user2 = self::create_elis_user($this->getDataGenerator());
+        $usercontext = context_user::instance($user1->id);
 
         // The list of users should not return anything yet (related data still haven't been created).
         $userlist = new \core_privacy\local\request\userlist($usercontext, $component);
         provider::get_users_in_context($userlist);
         $this->assertCount(0, $userlist);
 
-        // Create a token record.
-        self::create_token($user->id);
+        // Create a workflow record.
+        self::create_workflow_instance($user1->id);
+        // Create a user field instance.
+        self::create_elis_user_field($user1->idnumber);
+        self::create_elis_user_field($user2->idnumber);
 
         // The list of users for user context should return the user.
         provider::get_users_in_context($userlist);
         $this->assertCount(1, $userlist);
-        $expected = [$user->id];
+        $expected = [$user1->id];
         $actual = $userlist->get_userids();
         $this->assertEquals($expected, $actual);
 
@@ -140,20 +133,36 @@ return;
      * Test that user data is exported correctly.
      */
     public function test_export_user_data() {
-return;
-        // Create a user record.
-        $user = $this->getDataGenerator()->create_user();
-        $tokenrecord = self::create_token($user->id);
+        global $DB;
 
-        $usercontext = \context_user::instance($user->id);
+        $this->resetAfterTest();
+
+        // Create a user record.
+        $user1 = self::create_elis_user($this->getDataGenerator());
+        $user2 = self::create_elis_user($this->getDataGenerator());
+        // Create a workflow record.
+        $wid = self::create_workflow_instance($user1->id);
+        self::create_workflow_instance($user2->id);
+        $workflow = $DB->get_record('local_eliscore_wkflow_inst', ['id' => $wid]);
+        // Create a user field instance.
+        $efinfo = self::create_elis_user_field($user1->idnumber);
+        self::create_elis_user_field($user1->idnumber);
+        self::create_elis_user_field($user2->idnumber);
+        $elisfielddata = $DB->get_record($efinfo->table, ['id' => $efinfo->id]);
+        $elisfield = $DB->get_record('local_eliscore_field', ['id' => $elisfielddata->fieldid]);
+
+        $usercontext = \context_user::instance($user1->id);
 
         $writer = \core_privacy\local\request\writer::with_context($usercontext);
         $this->assertFalse($writer->has_any_data());
-        $approvedlist = new core_privacy\local\request\approved_contextlist($user, 'auth_kronosportal', [$usercontext->id]);
+        $approvedlist = new core_privacy\local\request\approved_contextlist($user1, 'local_eliscore', [$usercontext->id]);
         provider::export_user_data($approvedlist);
-        $data = $writer->get_data([]);
-        $this->assertEquals($tokenrecord->userid, $data->userid);
-        $this->assertEquals($tokenrecord->token, $data->token);
+        $data = $writer->get_data([get_string('privacy:metadata:local_eliscore', 'local_eliscore')]);
+        $this->assertEquals($workflow->type, $data->workflows[0]['type']);
+        $this->assertEquals($workflow->data, $data->workflows[0]['data']);
+        $this->assertCount(2, $data->elisfields);
+        $this->assertEquals($elisfield->name, $data->elisfields[0]['name']);
+        $this->assertEquals($elisfielddata->data, $data->elisfields[0]['data']);
     }
 
     /**
@@ -270,5 +279,81 @@ return;
         $userlist2 = new \core_privacy\local\request\userlist($usercontext2, $component);
         provider::get_users_in_context($userlist2);
         $this->assertCount(1, $userlist2);
+    }
+
+    /**
+     * Generate a Moodle and ELIS user and return it.
+     *
+     * @param testing_data_generator $generator
+     * @return stdClass
+     */
+    private static function create_elis_user(testing_data_generator $generator ) {
+        global $DB;
+
+        $user = $generator->create_user();
+        // Trigger the user created event so ELIS will create its user records.
+        \core\event\user_created::create_from_userid($user->id)->trigger();
+        // The events will have updated the user records. Reload them.
+        return $DB->get_record('user', ['id' => $user->id]);
+    }
+
+    /**
+     * Create a user workflow instance for testing.
+     *
+     * @param int $userid Data id of the user record.
+     * @return int Data id of the created record.
+     */
+    private static function create_workflow_instance($userid) {
+        global $DB;
+
+        // Create a workflow instance.
+        $record = (object)['type' => 'Type text', 'subtype' => 'Subtype text.', 'userid' => $userid,
+            'data' => 'This is the data.', 'timemodified' => time()];
+        return $DB->insert_record('local_eliscore_wkflow_inst', $record);
+    }
+
+    /**
+     * Create an ELIS user field for the specified user idnumber in one of four ELIS tables.
+     *
+     * @param string $useridnumber The data idnumber field of the user record.
+     * @return stdClass The table name and the data id of the created field instance.
+     */
+    private static function create_elis_user_field($useridnumber) {
+        global $DB;
+        static $num = 0;
+        $tables = ['local_eliscore_fld_data_text', 'local_eliscore_fld_data_int',
+            'local_eliscore_fld_data_num', 'local_eliscore_fld_data_char'];
+        $data = ['Test user data', 999, 888, 'Test data'];
+        $table = $tables[$num];
+        $datum = $data[$num];
+        $datatype = substr($table, strrpos($table, '_') + 1);
+        $num = ($num + 1) % 4;
+
+        $return = new stdClass();
+        $return->table = $table;
+
+        // Get the data id of the ELIS user field associated with the specified idnumber.
+        $elisuserid = $DB->get_field('local_elisprogram_usr', 'id', ['idnumber' => $useridnumber]);
+        // Get the context data id for the ELIS user data id.
+        $contextid = $DB->get_field('context', 'id', ['contextlevel' => CONTEXT_ELIS_USER, 'instanceid' => $elisuserid]);
+
+        // Create a test category for the field.
+        $record = (object)['name' => 'Test category'];
+        $categoryid = $DB->insert_record('local_eliscore_field_cats', $record);
+
+        // Link the category to the ELIS user context.
+        $record = (object)['categoryid' => $categoryid, 'contextlevel' => CONTEXT_ELIS_USER];
+        $DB->insert_record('local_eliscore_fld_cat_ctx', $record);
+
+        // Create a field item in the test category.
+        $record = (object)['shortname' => 'testfield', 'name' => 'Test Field', 'datatype' => $datatype,
+            'categoryid' => $categoryid];
+        $fieldid = $DB->insert_record('local_eliscore_field', $record);
+
+        // Create field data for the created field with the specified user context.
+        $record = (object)['contextid' => $contextid, 'fieldid' => $fieldid, 'data' => $datum];
+        $return->id = $DB->insert_record($table, $record);
+
+        return $return;
     }
 }

@@ -375,6 +375,7 @@ $string['form_period_help'] = 'This setting controls how often the schedule job 
 $string['required_field'] = 'Error: {$a} is a required field';
 
 // Privacy API strings.
+$string['privacy:metadata:local_eliscore'] = 'ELIS core local data';
 $string['privacy:metadata:local_eliscore_wkflow_inst'] = 'Data about in-progress workflows.';
 $string['privacy:metadata:local_eliscore_wkflow_inst:userid'] = 'The user that the workflow instance belongs to.';
 $string['privacy:metadata:local_eliscore_wkflow_inst:type'] = 'The type of workflow.';
