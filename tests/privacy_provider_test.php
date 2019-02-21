@@ -140,11 +140,11 @@ class local_eliscore_privacy_testcase extends \core_privacy\tests\provider_testc
         // Create a user record.
         $user1 = self::create_elis_user($this->getDataGenerator());
         $user2 = self::create_elis_user($this->getDataGenerator());
-        // Create a workflow record.
+        // Create workflow records.
         $wid = self::create_workflow_instance($user1->id);
         self::create_workflow_instance($user2->id);
         $workflow = $DB->get_record('local_eliscore_wkflow_inst', ['id' => $wid]);
-        // Create a user field instance.
+        // Create user field instances.
         $efinfo = self::create_elis_user_field($user1->idnumber);
         self::create_elis_user_field($user1->idnumber);
         self::create_elis_user_field($user2->idnumber);
@@ -170,26 +170,39 @@ class local_eliscore_privacy_testcase extends \core_privacy\tests\provider_testc
      */
     public function test_delete_data_for_all_users_in_context() {
         global $DB;
-return;
+
+        $this->resetAfterTest();
 
         // Create a user record.
-        $user1 = $this->getDataGenerator()->create_user();
-        self::create_token($user1->id);
+        $user1 = self::create_elis_user($this->getDataGenerator());
         $user1context = \context_user::instance($user1->id);
+        $user2 = self::create_elis_user($this->getDataGenerator());
+        // Create workflow records.
+        self::create_workflow_instance($user1->id);
+        self::create_workflow_instance($user2->id);
+        // Create user field instances.
+        $efinfo1 = self::create_elis_user_field($user1->idnumber);
+        $efinfo2 = self::create_elis_user_field($user1->idnumber);
+        $efinfo3 = self::create_elis_user_field($user2->idnumber);
 
-        $user2 = $this->getDataGenerator()->create_user();
-        self::create_token($user2->id);
+        // Get the first fieldid for later test.
+        $field1id = $DB->get_field($efinfo1->table, 'fieldid', ['id' => $efinfo1->id]);
 
         // Get all accounts. There should be two.
-        $this->assertCount(2, $DB->get_records('auth_kronosportal_tokens', []));
+        $this->assertCount(2, $DB->get_records('local_eliscore_wkflow_inst', []));
 
         // Delete everything for the first user context.
         provider::delete_data_for_all_users_in_context($user1context);
 
-        $this->assertCount(0, $DB->get_records('auth_kronosportal_tokens', ['userid' => $user1->id]));
+        // Only the user1 record should be gone.
+        $this->assertCount(0, $DB->get_records('local_eliscore_wkflow_inst', ['userid' => $user1->id]));
+        $this->assertCount(1, $DB->get_records('local_eliscore_wkflow_inst', []));
+        $this->assertCount(0, $DB->get_records($efinfo1->table, ['id' => $efinfo1->id]));
+        $this->assertCount(0, $DB->get_records($efinfo2->table, ['id' => $efinfo2->id]));
+        $this->assertCount(1, $DB->get_records($efinfo3->table, ['id' => $efinfo3->id]));
 
-        // Get all accounts. There should be one.
-        $this->assertCount(1, $DB->get_records('auth_kronosportal_tokens', []));
+        // The field itself should still exist.
+        $this->assertCount(1, $DB->get_records('local_eliscore_field', ['id' => $field1id]));
     }
 
     /**
@@ -197,49 +210,66 @@ return;
      */
     public function test_delete_data_for_user() {
         global $DB;
-return;
+
+        $this->resetAfterTest();
 
         // Create a user record.
-        $user1 = $this->getDataGenerator()->create_user();
-        self::create_token($user1->id);
+        $user1 = self::create_elis_user($this->getDataGenerator());
         $user1context = \context_user::instance($user1->id);
+        self::create_workflow_instance($user1->id);
+        $efinfo1 = self::create_elis_user_field($user1->idnumber);
+        $efinfo2 = self::create_elis_user_field($user1->idnumber);
+        // Get the first fieldid for later test.
+        $field1id = $DB->get_field($efinfo1->table, 'fieldid', ['id' => $efinfo1->id]);
 
-        $user2 = $this->getDataGenerator()->create_user();
-        self::create_token($user2->id);
+        $user2 = self::create_elis_user($this->getDataGenerator());
+        self::create_workflow_instance($user2->id);
+        $efinfo3 = self::create_elis_user_field($user2->idnumber);
 
         // Get all accounts. There should be two.
-        $this->assertCount(2, $DB->get_records('auth_kronosportal_tokens', []));
+        $this->assertCount(2, $DB->get_records('local_eliscore_wkflow_inst', []));
 
         // Delete everything for the first user.
-        $approvedlist = new \core_privacy\local\request\approved_contextlist($user1, 'auth_kronosportal', [$user1context->id]);
+        $approvedlist = new \core_privacy\local\request\approved_contextlist($user1, 'local_eliscore', [$user1context->id]);
         provider::delete_data_for_user($approvedlist);
 
-        $this->assertCount(0, $DB->get_records('auth_kronosportal_tokens', ['userid' => $user1->id]));
+        // Only the user1 record should be gone.
+        $this->assertCount(0, $DB->get_records('local_eliscore_wkflow_inst', ['userid' => $user1->id]));
+        $this->assertCount(1, $DB->get_records('local_eliscore_wkflow_inst', []));
+        $this->assertCount(0, $DB->get_records($efinfo1->table, ['id' => $efinfo1->id]));
+        $this->assertCount(0, $DB->get_records($efinfo2->table, ['id' => $efinfo2->id]));
+        $this->assertCount(1, $DB->get_records($efinfo3->table, ['id' => $efinfo3->id]));
 
-        // Get all accounts. There should be one.
-        $this->assertCount(1, $DB->get_records('auth_kronosportal_tokens', []));
+        // The field itself should still exist.
+        $this->assertCount(1, $DB->get_records('local_eliscore_field', ['id' => $field1id]));
     }
 
     /**
      * Test that data for users in approved userlist is deleted.
      */
     public function test_delete_data_for_users() {
+        global $DB;
+
         $this->resetAfterTest();
-return;
 
-        $component = 'auth_kronosportal';
-        // Create user1.
-        $user1 = $this->getDataGenerator()->create_user();
-        $usercontext1 = context_user::instance($user1->id);
-        self::create_token($user1->id);
+        $component = 'local_eliscore';
 
-        // Create user2.
-        $user2 = $this->getDataGenerator()->create_user();
-        $usercontext2 = context_user::instance($user2->id);
-        self::create_token($user2->id);
+        // Create a user record.
+        $user1 = self::create_elis_user($this->getDataGenerator());
+        $user1context = \context_user::instance($user1->id);
+        self::create_workflow_instance($user1->id);
+        $efinfo1 = self::create_elis_user_field($user1->idnumber);
+        $efinfo2 = self::create_elis_user_field($user1->idnumber);
+        // Get the first fieldid for later test.
+        $field1id = $DB->get_field($efinfo1->table, 'fieldid', ['id' => $efinfo1->id]);
+
+        $user2 = self::create_elis_user($this->getDataGenerator());
+        $user2context = \context_user::instance($user2->id);
+        self::create_workflow_instance($user2->id);
+        $efinfo3 = self::create_elis_user_field($user2->idnumber);
 
         // The list of users for usercontext1 should return user1.
-        $userlist1 = new \core_privacy\local\request\userlist($usercontext1, $component);
+        $userlist1 = new \core_privacy\local\request\userlist($user1context, $component);
         provider::get_users_in_context($userlist1);
         $this->assertCount(1, $userlist1);
         $expected = [$user1->id];
@@ -247,7 +277,7 @@ return;
         $this->assertEquals($expected, $actual);
 
         // The list of users for usercontext2 should return user2.
-        $userlist2 = new \core_privacy\local\request\userlist($usercontext2, $component);
+        $userlist2 = new \core_privacy\local\request\userlist($user2context, $component);
         provider::get_users_in_context($userlist2);
         $this->assertCount(1, $userlist2);
         $expected = [$user2->id];
@@ -255,17 +285,17 @@ return;
         $this->assertEquals($expected, $actual);
 
         // Add userlist1 to the approved user list.
-        $approvedlist = new \core_privacy\local\request\approved_userlist($usercontext1, $component, $userlist1->get_userids());
+        $approvedlist = new \core_privacy\local\request\approved_userlist($user1context, $component, $userlist1->get_userids());
 
         // Delete user data using delete_data_for_user for usercontext1.
         provider::delete_data_for_users($approvedlist);
 
         // Re-fetch users in usercontext1 - The user list should now be empty.
-        $userlist1 = new \core_privacy\local\request\userlist($usercontext1, $component);
+        $userlist1 = new \core_privacy\local\request\userlist($user1context, $component);
         provider::get_users_in_context($userlist1);
         $this->assertCount(0, $userlist1);
         // Re-fetch users in usercontext2 - The user list should not be empty (user2).
-        $userlist2 = new \core_privacy\local\request\userlist($usercontext2, $component);
+        $userlist2 = new \core_privacy\local\request\userlist($user2context, $component);
         provider::get_users_in_context($userlist2);
         $this->assertCount(1, $userlist2);
 
@@ -276,7 +306,7 @@ return;
         // Delete user1 data using delete_data_for_user.
         provider::delete_data_for_users($approvedlist);
         // Re-fetch users in usercontext2 - The user list should not be empty (user2).
-        $userlist2 = new \core_privacy\local\request\userlist($usercontext2, $component);
+        $userlist2 = new \core_privacy\local\request\userlist($user2context, $component);
         provider::get_users_in_context($userlist2);
         $this->assertCount(1, $userlist2);
     }

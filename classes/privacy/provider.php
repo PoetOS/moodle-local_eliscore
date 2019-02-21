@@ -94,8 +94,6 @@ class provider implements
      * @return  contextlist   $contextlist  The list of contexts used in this plugin.
      */
     public static function get_contexts_for_userid(int $userid): \core_privacy\local\request\contextlist {
-        global $DB;
-
         $contextlist = new \core_privacy\local\request\contextlist();
 
         // If the user exists in any of the ELIS core tables, add the user context and return it.
@@ -113,7 +111,6 @@ class provider implements
      * context/plugin combination.
      */
     public static function get_users_in_context(\core_privacy\local\request\userlist $userlist) {
-
         $context = $userlist->get_context();
         if (!$context instanceof \context_user) {
             return;
@@ -131,8 +128,6 @@ class provider implements
      * @param   approved_contextlist $contextlist The approved contexts to export information for.
      */
     public static function export_user_data(\core_privacy\local\request\approved_contextlist $contextlist) {
-        global $DB;
-
         if (empty($contextlist->count())) {
             return;
         }
@@ -173,13 +168,9 @@ class provider implements
      * @param context $context Context to delete data from.
      */
     public static function delete_data_for_all_users_in_context(\context $context) {
-        global $DB;
-
         if ($context->contextlevel == CONTEXT_USER) {
-            // Delete all user request data for the activity context.
-            if ($cm = get_coursemodule_from_id('kronossandvm', $context->instanceid)) {
-                $DB->delete_records('kronossandvm_requests', ['vmid' => $cm->instance]);
-            }
+            // Because we only use user contexts the instance ID is the user ID.
+            self::delete_user_data($context->instanceid);
         }
     }
 
@@ -189,18 +180,14 @@ class provider implements
      * @param   approved_contextlist $contextlist The approved contexts and user information to delete information for.
      */
     public static function delete_data_for_user(\core_privacy\local\request\approved_contextlist $contextlist) {
-        global $DB;
-
         if (empty($contextlist->count())) {
             return;
         }
 
-        $userid = $contextlist->get_user()->id;
         foreach ($contextlist->get_contexts() as $context) {
-            if ($context->contextlevel == CONTEXT_MODULE) {
-                $cm = get_coursemodule_from_id('kronossandvm', $context->instanceid);
-                $params = ['userid' => $userid, 'vmid' => $cm->instance];
-                $DB->delete_records('kronossandvm_requests', $params);
+            if ($context->contextlevel == CONTEXT_USER) {
+                // Because we only use user contexts the instance ID is the user ID.
+                self::delete_user_data($context->instanceid);
             }
         }
     }
@@ -212,20 +199,10 @@ class provider implements
      * information for.
      */
     public static function delete_data_for_users(\core_privacy\local\request\approved_userlist $userlist) {
-        global $DB;
-
         $context = $userlist->get_context();
-
-        if (!$context instanceof \context_module) {
-            return;
-        }
-
-        if ($cm = get_coursemodule_from_id('kronossandvm', $context->instanceid)) {
-            $userids = $userlist->get_userids();
-            list($usersql, $userparams) = $DB->get_in_or_equal($userids, SQL_PARAMS_NAMED);
-            $select = "vmid = :vmid AND userid $usersql";
-            $params = ['vmid' => $cm->instance] + $userparams;
-            $DB->delete_records_select('kronossandvm_requests', $select, $params);
+        // Because we only use user contexts the instance ID is the user ID.
+        if ($context instanceof \context_user) {
+            self::delete_user_data($context->instanceid);
         }
     }
 
@@ -252,7 +229,7 @@ class provider implements
      * Return the workflow record for the specified user.
      *
      * @param int $userid The user to check for.
-     * @return stdClass The data or empty record.
+     * @return array
      */
     private static function user_workflow_data(int $userid) {
         global $DB;
@@ -264,7 +241,7 @@ class provider implements
      * Return the ELIS core field records for the specified user.
      *
      * @param int $userid The user to check for.
-     * @return stdClass The data or empty record.
+     * @return array The data or empty record.
      */
     private static function user_field_data(int $userid) {
         global $DB;
@@ -272,7 +249,7 @@ class provider implements
         $data = [];
         $tables = ['local_eliscore_fld_data_text', 'local_eliscore_fld_data_int',
             'local_eliscore_fld_data_num', 'local_eliscore_fld_data_char'];
-        $select = 'SELECT ecfd.id, ecf.id as fieldid, ecf.name, ecfd.data ';
+        $select = 'SELECT ecfd.id, ecf.id as fieldid, ecf.name, ecfd.data, ';
         $conditions = 'INNER JOIN {local_eliscore_field} ecf ON ecfd.fieldid = ecf.id ' .
             'INNER JOIN {local_eliscore_fld_cat_ctx} ecfc ON ecf.categoryid = ecfc.categoryid AND ' .
             'ecfc.contextlevel = :usercontext1 ' .
@@ -284,12 +261,28 @@ class provider implements
 
         foreach ($tables as $table) {
             $from = 'FROM {' . $table . '} ecfd ';
-            $sql = $select . $from . $conditions;
+            $sql = $select . '\'' . $table . '\' as tablename '. $from . $conditions;
             if (!empty($records = $DB->get_records_sql($sql, $params))) {
                 $data = array_merge($data, $records);
             }
         }
 
         return $data;
+    }
+
+    /**
+     * Delete all plugin data for the specified user id.
+     *
+     * @param int $userid The Moodle user id to delete data for.
+     */
+    private static function delete_user_data($userid) {
+        global $DB;
+
+        $DB->delete_records('local_eliscore_wkflow_inst', ['userid' => $userid]);
+
+        $recordsinfo = self::user_field_data($userid);
+        foreach ($recordsinfo as $recordinfo) {
+            $DB->delete_records($recordinfo->tablename, ['id' => $recordinfo->id]);
+        }
     }
 }
