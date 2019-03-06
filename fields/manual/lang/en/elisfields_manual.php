@@ -27,3 +27,4 @@ $string['password_control'] = 'Password input';
 $string['pluginname'] = 'ELIS Manual Fields';
 $string['unset_theme_option'] = 'N/A';
 
+$string['privacy:metadata'] = 'This subplugin stores no information. Code that uses this subplugin may store information.';
