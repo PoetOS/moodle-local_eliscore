@@ -36,3 +36,12 @@ $string['eliscore_etl'] = 'User Activity ETL';
 $string['etl_disabled'] = 'Disable ETL';
 $string['etl_disabled_description'] = 'Disabling the ETL will prohibit use of the ELIS Site-Wide Time Summary Report, which requires this data.';
 $string['pluginname'] = 'User Activity ETL';
+
+$string['privacy:metadata:eliscore_etl'] = 'ETL activity data';
+$string['privacy:metadata:eliscore_etl_useractivity'] = 'User activity ETL data';
+$string['privacy:metadata:eliscore_etl_modactivity'] = 'User module activity ETL data';
+$string['privacy:metadata:eliscore_etl:userid'] = 'ID of the user for the activity.';
+$string['privacy:metadata:eliscore_etl:courseid'] = 'ID of the course for the activity.';
+$string['privacy:metadata:eliscore_etl:cmid'] = 'Course module ID for the activity.';
+$string['privacy:metadata:eliscore_etl:hour'] = 'Hour the ETL started.';
+$string['privacy:metadata:eliscore_etl:duration'] = 'Time that activity will run.';
