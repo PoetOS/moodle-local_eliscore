@@ -99,6 +99,16 @@ class provider implements
         // If the user exists in any of the ELIS core tables, add the user context and return it.
         if (self::user_has_eliscore_data($userid)) {
             $contextlist->add_user_context($userid);
+        } else {
+            $subplugintypeproviders = self::subplugin_providers();
+            foreach ($subplugintypeproviders as $subpluginproviders) {
+                foreach ($subpluginproviders as $subplugin) {
+                    if ($subplugin->user_has_data($userid)) {
+                        $contextlist->add_user_context($userid);
+                        break 2;
+                    }
+                }
+            }
         }
 
         return $contextlist;
@@ -119,6 +129,16 @@ class provider implements
         // If the user exists in any of the ELIS core tables, add the user context and return it.
         if (self::user_has_eliscore_data($context->instanceid)) {
             $userlist->add_user($context->instanceid);
+        } else {
+            $subplugintypeproviders = self::subplugin_providers();
+            foreach ($subplugintypeproviders as $subpluginproviders) {
+                foreach ($subpluginproviders as $subplugin) {
+                    if ($subplugin->user_has_data($context->instanceid)) {
+                        $userlist->add_user($context->instanceid);
+                        break 2;
+                    }
+                }
+            }
         }
     }
 
@@ -156,6 +176,8 @@ class provider implements
                 'data' => $elisfield->data,
             ];
         }
+
+        self::add_subplugin_data($data, $user->id);
 
         \core_privacy\local\request\writer::with_context($context)->export_data([
             get_string('privacy:metadata:local_eliscore', 'local_eliscore')
@@ -283,6 +305,51 @@ class provider implements
         $recordsinfo = self::user_field_data($userid);
         foreach ($recordsinfo as $recordinfo) {
             $DB->delete_records($recordinfo->tablename, ['id' => $recordinfo->id]);
+        }
+    }
+
+    /**
+     * Get all subplugins that implement subplugin providers.
+     * @return array An array by subplugin type of an array of all of that subtype's provider objects.
+     */
+    private static function subplugin_providers() {
+        $providers = [];
+        $providers['elisfields'] = self::subplugin_type_providers('elisfields');
+        $providers['eliscore'] = self::subplugin_type_providers('eliscore');
+        return $providers;
+    }
+
+    /**
+     * Get all providers for the specified subplugin type.
+     * @param string $subplugintype The name of the subplugintype.
+     * @return array An array of each subtype object.
+     */
+    private static function subplugin_type_providers($subplugintype) {
+        $typeplugins = \core_component::get_plugin_list($subplugintype);
+        $providers = [];
+        foreach ($typeplugins as $typename => $typelocation) {
+            $classname = "\\{$subplugintype}_{$typename}\\privacy\\provider";
+            $implementations = class_implements($classname);
+            if (in_array('local_eliscore\privacy\\' . $subplugintype . '_provider', $implementations)) {
+                $providers[$typename] = new $classname;
+            }
+        }
+
+        return $providers;
+    }
+
+    /**
+     * Add all subplugin export data to the provided object.
+     * @param \stdClass $data The object to add data to.
+     * @param int $userid The user to add data for.
+     */
+    private static function add_subplugin_data($data, $userid) {
+        $subplugintypeproviders = self::subplugin_providers();
+        foreach ($subplugintypeproviders as $subplugintype => $subpluginproviders) {
+            $data->{$subplugintype} = [];
+            foreach ($subpluginproviders as $subpluginname => $subplugin) {
+                $data->{$subplugintype}[$subpluginname] = $subplugin->add_user_data($userid);
+            }
         }
     }
 }

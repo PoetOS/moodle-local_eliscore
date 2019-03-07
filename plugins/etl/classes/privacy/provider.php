@@ -31,11 +31,8 @@ class provider implements
     // This plugin has data.
     \core_privacy\local\metadata\provider,
 
-    // This plugin is capable of determining which users have data within it.
-    \core_privacy\local\request\core_userlist_provider,
-
-    // This plugin currently implements the original plugin_provider interface.
-    \core_privacy\local\request\plugin\provider {
+    // This plugin has elicore subplugin user data.
+    \local_eliscore\privacy\eliscore_provider {
 
     /**
      * Returns meta data about this system.
@@ -64,72 +61,39 @@ class provider implements
 
         return $collection;
     }
-
     /**
-     * Get the list of contexts that contain user information for the specified user.
+     * Indicates whether or not the subplugin has any user data for the provided user.
      *
-     * @param   int $userid The user to search.
-     * @return  contextlist   $contextlist  The list of contexts used in this plugin.
+     * @param int $userid The user ID to get context IDs for.
+     * @return boolean Indicating data presence.
+     * @param \core_privacy\local\request\contextlist $contextlist Use add_from_sql with this object to add your context IDs.
      */
-    public static function get_contexts_for_userid(int $userid): \core_privacy\local\request\contextlist {
+    public static function user_has_data(int $userid){
         global $DB;
 
-        $contextlist = new \core_privacy\local\request\contextlist();
-
-        // If the user exists in any of the ELIS core tables, add the user context and return it.
-        if (self::user_has_etl_data($userid)) {
-            $contextlist->add_user_context($userid);
-        }
-
-        return $contextlist;
+        return $DB->record_exists('eliscore_etl_modactivity', ['userid' => $userid]) ||
+            $DB->record_exists('eliscore_etl_useractivity', ['userid' => $userid]);
     }
 
     /**
-     * Get the list of users who have data within a context.
+     * Return all user data for the specified user.
      *
-     * @param \core_privacy\local\request\userlist $userlist The userlist containing the list of users who have data in this
-     * context/plugin combination.
+     * @param int $userid The id of the user the data is for.
+     * @return array An array of arrays of each data collection for this user and subplugin.
      */
-    public static function get_users_in_context(\core_privacy\local\request\userlist $userlist) {
-        $context = $userlist->get_context();
-        if (!$context instanceof \context_user) {
-            return;
-        }
-
-        // If the user exists in any of the ELIS core tables, add the user context and return it.
-        if (self::user_has_etl_data($context->instanceid)) {
-            $userlist->add_user($context->instanceid);
-        }
-    }
-
-    /**
-     * Export all user data for the specified user, in the specified contexts, using the supplied exporter instance.
-     *
-     * @param   approved_contextlist $contextlist The approved contexts to export information for.
-     */
-    public static function export_user_data(\core_privacy\local\request\approved_contextlist $contextlist) {
+    public static function add_user_data(int $userid) {
         global $DB;
 
-        if (empty($contextlist->count())) {
-            return;
-        }
-
-        // Export ELIS core data.
-        $data = new \stdClass();
-        $data->useractivity = [];
-        $data->modactivity = [];
-        $user = $contextlist->get_user();
-        $context = \context_user::instance($user->id);
-
+        $data = [];
         $sql = 'SELECT eu.*, c.fullname ' .
             'FROM {eliscore_etl_useractivity} eu ' .
             'INNER JOIN {course} c ON eu.courseid = c.id ' .
             'WHERE eu.userid = :userid';
-        $params = ['userid' => $user->id];
-        $userrecords = $DB->get_record_sql($sql, $params);
+        $params = ['userid' => $userid];
+        $userrecords = $DB->get_records_sql($sql, $params);
 
         foreach ($userrecords as $userrecord) {
-            $data->useractivity[] = [
+            $data['useractivity'][] = [
                 'course' => $userrecord->fullname,
                 'hour' => $userrecord->hour,
                 'duration' => $userrecord->duration,
@@ -138,16 +102,16 @@ class provider implements
 
         $sql = 'SELECT em.*, c.fullname, cm.instance, m.name as module ' .
             'FROM {eliscore_etl_modactivity} em ' .
-            'INNER JOIN {course} c ON eu.courseid = c.id ' .
-            'INNER JOIN {course_modules} cm ON eu.cmid = cm.id ' .
+            'INNER JOIN {course} c ON em.courseid = c.id ' .
+            'INNER JOIN {course_modules} cm ON em.cmid = cm.id ' .
             'INNER JOIN {modules} m ON cm.module = m.id ' .
-            'WHERE eu.userid = :userid';
-        $params = ['userid' => $user->id];
-        $modrecords = $DB->get_record_sql($sql, $params);
+            'WHERE em.userid = :userid';
+        $params = ['userid' => $userid];
+        $modrecords = $DB->get_records_sql($sql, $params);
 
         foreach ($modrecords as $modrecord) {
             $modname = $DB->get_field($modrecord->module, 'name', ['id' => $modrecord->instance]);
-            $data->modactivity[] = [
+            $data['modactivity'][] = [
                 'course' => $modrecord->fullname,
                 'module' => $modrecord->module . ': ' . $modname,
                 'hour' => $modrecord->hour,
@@ -155,83 +119,15 @@ class provider implements
             ];
         }
 
-        \core_privacy\local\request\writer::with_context($context)->export_data([
-            get_string('privacy:metadata:eliscore_etl', 'eliscore_etl')
-        ], $data);
+        return $data;
     }
 
     /**
-     * Delete all personal data for all users in the specified context.
-     *
-     * @param context $context Context to delete data from.
-     */
-    public static function delete_data_for_all_users_in_context(\context $context) {
-        if ($context->contextlevel == CONTEXT_USER) {
-            // Because we only use user contexts the instance ID is the user ID.
-            self::delete_user_data($context->instanceid);
-        }
-    }
-
-    /**
-     * Delete all user data for the specified user, in the specified contexts.
-     *
-     * @param   approved_contextlist $contextlist The approved contexts and user information to delete information for.
-     */
-    public static function delete_data_for_user(\core_privacy\local\request\approved_contextlist $contextlist) {
-        if (empty($contextlist->count())) {
-            return;
-        }
-
-        foreach ($contextlist->get_contexts() as $context) {
-            if ($context->contextlevel == CONTEXT_USER) {
-                // Because we only use user contexts the instance ID is the user ID.
-                self::delete_user_data($context->instanceid);
-            }
-        }
-    }
-
-    /**
-     * Delete multiple users within a single context.
-     *
-     * @param \core_privacy\local\request\approved_userlist $userlist The approved context and user information to delete
-     * information for.
-     */
-    public static function delete_data_for_users(\core_privacy\local\request\approved_userlist $userlist) {
-        $context = $userlist->get_context();
-        // Because we only use user contexts the instance ID is the user ID.
-        if ($context instanceof \context_user) {
-            self::delete_user_data($context->instanceid);
-        }
-    }
-
-    /**
-     * Return true if the specified userid has data in the ELIS core tables.
-     *
-     * @param int $userid The user to check for.
-     * @return boolean
-     */
-    private static function user_has_etl_data(int $userid) {
-        global $DB;
-
-        $hasdata = false;
-        // If the user exists in any of the ELIS etl tables, return true.
-        if ($DB->record_exists('eliscore_etl_useractivity', ['userid' => $userid]) ||
-            $DB->record_exists('eliscore_etl_modactivity', ['userid' => $userid])) {
-            $hasdata = true;
-        }
-
-        return $hasdata;
-    }
-
-    /**
-     * Delete all plugin data for the specified user id.
+     * Delete all subplugin data for the specified user id.
      *
      * @param int $userid The Moodle user id to delete data for.
      */
-    private static function delete_user_data($userid) {
-        global $DB;
+    public static function delete_user_data($userid) {
 
-        $DB->delete_records('eliscore_etl_modactivity', ['userid' => $userid]);
-        $DB->delete_records('eliscore_etl_useractivity', ['userid' => $userid]);
     }
 }
