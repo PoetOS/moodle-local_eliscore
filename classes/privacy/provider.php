@@ -171,7 +171,7 @@ class provider implements
 
         $elisfieldsdata = self::user_field_data($user->id);
         foreach ($elisfieldsdata as $elisfield) {
-            $data->elisfields[] = [
+            $data->elisdatafields[] = [
                 'name' => $elisfield->name,
                 'data' => $elisfield->data,
             ];
@@ -306,6 +306,14 @@ class provider implements
         foreach ($recordsinfo as $recordinfo) {
             $DB->delete_records($recordinfo->tablename, ['id' => $recordinfo->id]);
         }
+
+        // Now handle any subplugin data.
+        $subplugintypeproviders = self::subplugin_providers();
+        foreach ($subplugintypeproviders as $subpluginproviders) {
+            foreach ($subpluginproviders as $subplugin) {
+                $subplugin->delete_user_data($userid);
+            }
+        }
     }
 
     /**
@@ -314,24 +322,15 @@ class provider implements
      */
     private static function subplugin_providers() {
         $providers = [];
-        $providers['elisfields'] = self::subplugin_type_providers('elisfields');
-        $providers['eliscore'] = self::subplugin_type_providers('eliscore');
-        return $providers;
-    }
-
-    /**
-     * Get all providers for the specified subplugin type.
-     * @param string $subplugintype The name of the subplugintype.
-     * @return array An array of each subtype object.
-     */
-    private static function subplugin_type_providers($subplugintype) {
-        $typeplugins = \core_component::get_plugin_list($subplugintype);
-        $providers = [];
-        foreach ($typeplugins as $typename => $typelocation) {
-            $classname = "\\{$subplugintype}_{$typename}\\privacy\\provider";
-            $implementations = class_implements($classname);
-            if (in_array('local_eliscore\privacy\\' . $subplugintype . '_provider', $implementations)) {
-                $providers[$typename] = new $classname;
+        $subplugintypes = \core_component::get_subplugins('local_eliscore');
+        foreach ($subplugintypes as $subplugintype => $typeplugins) {
+            $providers[$subplugintype] = [];
+            foreach ($typeplugins as $typename) {
+                $classname = "\\{$subplugintype}_{$typename}\\privacy\\provider";
+                $implementations = class_implements($classname);
+                if (in_array('local_eliscore\privacy\\' . $subplugintype . '_provider', $implementations)) {
+                    $providers[$subplugintype][] = new $classname;
+                }
             }
         }
 

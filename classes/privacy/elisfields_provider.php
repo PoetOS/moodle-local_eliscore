@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * ELISfields subplugin privacy interface.
+ * ELISfields subplugin privacy interface. A subplugin should implement this if it stores user data.
  *
  * @package    elisfields
  * @author     Remote-Learner.net Inc
@@ -27,7 +27,13 @@ namespace local_elisfields\privacy;
 
 defined('MOODLE_INTERNAL') || die();
 
-interface elisfields_provider extends \core_privacy\local\request\plugin\subplugin_provider {
+interface elisfields_provider extends
+    // Identifies the subplugin to the privacy API (I think).
+    \core_privacy\local\request\plugin\subplugin_provider,
+
+    // This prevents the "Userlist provider missing" flag in the plugin privacy registry, since this interface will pass that data
+    // back to the main plugin.
+    \core_privacy\local\request\shared_userlist_provider {
 
     /**
      * Indicates whether or not the subplugin has any user data for the provided user.

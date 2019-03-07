@@ -128,6 +128,9 @@ class provider implements
      * @param int $userid The Moodle user id to delete data for.
      */
     public static function delete_user_data($userid) {
+        global $DB;
 
+        $DB->delete_records('eliscore_etl_modactivity', ['userid' => $userid]);
+        $DB->delete_records('eliscore_etl_useractivity', ['userid' => $userid]);
     }
 }

@@ -58,9 +58,11 @@ class local_eliscore_privacy_testcase extends \core_privacy\tests\provider_testc
 
         $user1 = self::create_elis_user($this->getDataGenerator());
         $user2 = self::create_elis_user($this->getDataGenerator());
+        $user3 = self::create_elis_user($this->getDataGenerator());
 
         $this->assertEmpty(provider::get_contexts_for_userid($user1->id));
         $this->assertEmpty(provider::get_contexts_for_userid($user2->id));
+        $this->assertEmpty(provider::get_contexts_for_userid($user3->id));
 
         // Create a workflow instance.
         self::create_workflow_instance($user1->id);
@@ -90,6 +92,16 @@ class local_eliscore_privacy_testcase extends \core_privacy\tests\provider_testc
 
         // Check that a context is returned and is the expected context.
         $usercontext = \context_user::instance($user2->id);
+        $this->assertEquals($usercontext->id, $contextlist->get_contextids()[0]);
+
+        // Create some ETL data for user3.
+        self::create_etl_data($user3->id);
+        $contextlist = provider::get_contexts_for_userid($user3->id);
+        // Check that we only get back one context.
+        $this->assertCount(1, $contextlist);
+
+        // Check that a context is returned and is the expected context.
+        $usercontext = \context_user::instance($user3->id);
         $this->assertEquals($usercontext->id, $contextlist->get_contextids()[0]);
     }
 
@@ -150,6 +162,8 @@ class local_eliscore_privacy_testcase extends \core_privacy\tests\provider_testc
         self::create_elis_user_field($user2->idnumber);
         $elisfielddata = $DB->get_record($efinfo->table, ['id' => $efinfo->id]);
         $elisfield = $DB->get_record('local_eliscore_field', ['id' => $elisfielddata->fieldid]);
+        // Create some ETL data for user1.
+        self::create_etl_data($user1->id);
 
         $usercontext = \context_user::instance($user1->id);
 
@@ -160,9 +174,16 @@ class local_eliscore_privacy_testcase extends \core_privacy\tests\provider_testc
         $data = $writer->get_data([get_string('privacy:metadata:local_eliscore', 'local_eliscore')]);
         $this->assertEquals($workflow->type, $data->workflows[0]['type']);
         $this->assertEquals($workflow->data, $data->workflows[0]['data']);
-        $this->assertCount(2, $data->elisfields);
-        $this->assertEquals($elisfield->name, $data->elisfields[0]['name']);
-        $this->assertEquals($elisfielddata->data, $data->elisfields[0]['data']);
+        $this->assertCount(2, $data->elisdatafields);
+        $this->assertEquals($elisfield->name, $data->elisdatafields[0]['name']);
+        $this->assertEquals($elisfielddata->data, $data->elisdatafields[0]['data']);
+        $this->assertCount(2, $data->eliscore[0]);
+        $this->assertCount(1, $data->eliscore[0]['useractivity']);
+        $this->assertCount(1, $data->eliscore[0]['modactivity']);
+        $this->assertNotEmpty($data->eliscore[0]['useractivity'][0]['course']);
+        $this->assertNotEmpty($data->eliscore[0]['useractivity'][0]['hour']);
+        $this->assertContains('assign', $data->eliscore[0]['modactivity'][0]['module']);
+        $this->assertEquals(17, $data->eliscore[0]['modactivity'][0]['hour']);
     }
 
     /**
@@ -184,6 +205,8 @@ class local_eliscore_privacy_testcase extends \core_privacy\tests\provider_testc
         $efinfo1 = self::create_elis_user_field($user1->idnumber);
         $efinfo2 = self::create_elis_user_field($user1->idnumber);
         $efinfo3 = self::create_elis_user_field($user2->idnumber);
+        // Create some ETL data for user1.
+        self::create_etl_data($user1->id);
 
         // Get the first fieldid for later test.
         $field1id = $DB->get_field($efinfo1->table, 'fieldid', ['id' => $efinfo1->id]);
@@ -200,6 +223,8 @@ class local_eliscore_privacy_testcase extends \core_privacy\tests\provider_testc
         $this->assertCount(0, $DB->get_records($efinfo1->table, ['id' => $efinfo1->id]));
         $this->assertCount(0, $DB->get_records($efinfo2->table, ['id' => $efinfo2->id]));
         $this->assertCount(1, $DB->get_records($efinfo3->table, ['id' => $efinfo3->id]));
+        $this->assertCount(0, $DB->get_records('eliscore_etl_modactivity', ['userid' => $user1->id]));
+        $this->assertCount(0, $DB->get_records('eliscore_etl_useractivity', ['userid' => $user1->id]));
 
         // The field itself should still exist.
         $this->assertCount(1, $DB->get_records('local_eliscore_field', ['id' => $field1id]));
@@ -385,5 +410,31 @@ class local_eliscore_privacy_testcase extends \core_privacy\tests\provider_testc
         $return->id = $DB->insert_record($table, $record);
 
         return $return;
+    }
+
+    /**
+     * Create data for the eliscore / etl subplugin.
+     * @param int $userid The Moodle user id to create data for.
+     */
+    private static function create_etl_data($userid) {
+        global $DB;
+
+        $course = self::getDataGenerator()->create_course();
+        $assign = self::getDataGenerator()->create_module('assign', ['course' => $course->id]);
+        $assigncm = get_coursemodule_from_id('assign', $assign->cmid);
+
+        $DB->insert_record('eliscore_etl_useractivity',
+            ['userid' => $userid,
+             'courseid' => $course->id,
+             'hour' => 4,
+             'duration' => 120,
+            ]);
+        $DB->insert_record('eliscore_etl_modactivity',
+            ['userid' => $userid,
+             'courseid' => $course->id,
+             'cmid' => $assigncm->id,
+             'hour' => 17,
+             'duration' => 30,
+            ]);
     }
 }
