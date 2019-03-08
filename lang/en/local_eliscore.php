@@ -402,3 +402,6 @@ $string['privacy:metadata:local_eliscore_fld_data_char'] = 'Custom field data fo
 $string['privacy:metadata:local_eliscore_fld_data_char:contextid'] = 'The user id associated with this field data.';
 $string['privacy:metadata:local_eliscore_fld_data_char:fieldid'] = 'The field id defining this field data.';
 $string['privacy:metadata:local_eliscore_fld_data_char:data'] = 'The actual data assigned to this user.';
+
+$string['privacy:metadata:elisfieldspluginsummary'] = 'ELIS fields subplugin data.';
+$string['privacy:metadata:eliscorepluginsummary'] = 'ELIS core subplugin data.';

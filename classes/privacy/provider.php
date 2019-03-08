@@ -84,6 +84,9 @@ class provider implements
             'data' => 'privacy:metadata:local_eliscore_fld_data_char:data',
         ], 'privacy:metadata:local_eliscore_fld_data_char');
 
+        $collection->add_plugintype_link('elisfields', [], 'privacy:metadata:elisfieldspluginsummary');
+        $collection->add_plugintype_link('eliscore', [], 'privacy:metadata:eliscorepluginsummary');
+
         return $collection;
     }
 
