@@ -332,7 +332,7 @@ class provider implements
                 $classname = "\\{$subplugintype}_{$typename}\\privacy\\provider";
                 $implementations = class_implements($classname);
                 if (in_array('local_eliscore\privacy\\' . $subplugintype . '_provider', $implementations)) {
-                    $providers[$subplugintype][] = new $classname;
+                    $providers[$subplugintype][$typename] = new $classname;
                 }
             }
         }
