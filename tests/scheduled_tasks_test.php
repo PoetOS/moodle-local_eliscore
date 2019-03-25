@@ -27,7 +27,6 @@ require_once(dirname(__FILE__).'/../test_config.php');
 global $CFG;
 require_once($CFG->dirroot.'/local/eliscore/lib/setup.php');
 require_once(elis::lib('data/data_object.class.php'));
-require_once('PHPUnit/Extensions/Database/DataSet/CsvDataSet.php');
 require_once(elis::lib('tasklib.php'));
 
 /**

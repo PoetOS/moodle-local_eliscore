@@ -177,13 +177,13 @@ class local_eliscore_privacy_testcase extends \core_privacy\tests\provider_testc
         $this->assertCount(2, $data->elisdatafields);
         $this->assertEquals($elisfield->name, $data->elisdatafields[0]['name']);
         $this->assertEquals($elisfielddata->data, $data->elisdatafields[0]['data']);
-        $this->assertCount(2, $data->eliscore[0]);
-        $this->assertCount(1, $data->eliscore[0]['useractivity']);
-        $this->assertCount(1, $data->eliscore[0]['modactivity']);
-        $this->assertNotEmpty($data->eliscore[0]['useractivity'][0]['course']);
-        $this->assertNotEmpty($data->eliscore[0]['useractivity'][0]['hour']);
-        $this->assertContains('assign', $data->eliscore[0]['modactivity'][0]['module']);
-        $this->assertEquals(17, $data->eliscore[0]['modactivity'][0]['hour']);
+        $this->assertCount(2, $data->eliscore['etl']);
+        $this->assertCount(1, $data->eliscore['etl']['useractivity']);
+        $this->assertCount(1, $data->eliscore['etl']['modactivity']);
+        $this->assertNotEmpty($data->eliscore['etl']['useractivity'][0]['course']);
+        $this->assertNotEmpty($data->eliscore['etl']['useractivity'][0]['hour']);
+        $this->assertContains('assign', $data->eliscore['etl']['modactivity'][0]['module']);
+        $this->assertEquals(17, $data->eliscore['etl']['modactivity'][0]['hour']);
     }
 
     /**

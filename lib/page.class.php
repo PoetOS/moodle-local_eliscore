@@ -83,9 +83,15 @@ abstract class elis_page extends moodle_page {
      * from the current HTTP request.
      */
     public function __construct(array $params=null) {
+        global $CFG;
+
         $this->params = $params;
         $this->set_context($this->_get_page_context());
-        $this->set_url($this->_get_page_url(), $this->_get_page_params());
+        $url = $this->_get_page_url();
+        if (empty($url)) {
+            $url = $CFG->wwwroot . '/';
+        }
+        $this->set_url($url, $this->_get_page_params());
         $this->get_header_requirements();
         // ELIS-9092: If including jquery-ui must make sure not broken by re-loads of jquery(base).
         if (!empty($this->_requires)) {

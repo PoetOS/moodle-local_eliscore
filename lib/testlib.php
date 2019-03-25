@@ -27,7 +27,6 @@ defined('MOODLE_INTERNAL') or die();
 
 global $CFG;
 require_once($CFG->libdir.'/phpunit/lib.php');
-require_once('PHPUnit/Extensions/Database/DataSet/CsvDataSet.php');
 
 /**
  * Base class for ELIS PHPUnit tests that require a database connection.
@@ -48,9 +47,9 @@ abstract class elis_database_test extends advanced_testcase {
      * @param PHPUnit_Extensions_Database_DataSet_ITable $actual
      * @param string $message
      */
-    public static function assertTablesEqual(PHPUnit_Extensions_Database_DataSet_ITable $expected,
-                                             PHPUnit_Extensions_Database_DataSet_ITable $actual, $message = '') {
-        $constraint = new PHPUnit_Extensions_Database_Constraint_TableIsEqual($expected);
+    public static function assertTablesEqual(PHPUnit\DbUnit\DataSet\ITable $expected,
+                                             PHPUnit\DbUnit\DataSet\ITable $actual, $message = '') {
+        $constraint = new PHPUnit\DbUnit\Constraint\TableIsEqual($expected);
 
         self::assertThat($actual, $constraint, $message);
     }
@@ -61,9 +60,9 @@ abstract class elis_database_test extends advanced_testcase {
      * @param PHPUnit_Extensions_Database_DataSet_ITable $actual
      * @param string $message
      */
-    public static function assertDataSetsEqual(PHPUnit_Extensions_Database_DataSet_IDataSet $expected,
-                                               PHPUnit_Extensions_Database_DataSet_IDataSet $actual, $message = '') {
-        $constraint = new PHPUnit_Extensions_Database_Constraint_DataSetIsEqual($expected);
+    public static function assertDataSetsEqual(PHPUnit\DbUnit\DataSet\IDataSet $expected,
+                                               PHPUnit\DbUnit\DataSet\IDataSet $actual, $message = '') {
+        $constraint = new PHPUnit\DbUnit\Constraint\DataSetIsEqual($expected);
 
         self::assertThat($actual, $constraint, $message);
     }
@@ -90,7 +89,7 @@ abstract class elis_database_test extends advanced_testcase {
 /**
  * PHPUnit DataTable for a Moodle recordset (or record array, or ELIS data collection)
  */
-class moodle_recordset_phpunit_datatable extends PHPUnit_Extensions_Database_DataSet_DefaultTable {
+class moodle_recordset_phpunit_datatable extends \PHPUnit\DbUnit\DataSet\DefaultTable {
     public function __construct($tablename, $rs) {
         // Try to get the column names from an entry.
         if (is_array($rs)) {
@@ -115,7 +114,7 @@ class moodle_recordset_phpunit_datatable extends PHPUnit_Extensions_Database_Dat
             $columns = array();
         }
 
-        $metadata = new PHPUnit_Extensions_Database_DataSet_DefaultTableMetaData($tablename, $columns);
+        $metadata = new \PHPUnit\DbUnit\DataSet\DefaultTableMetaData($tablename, $columns);
 
         parent::__construct($metadata);
 

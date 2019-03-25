@@ -30,7 +30,7 @@ require_once($CFG->dirroot.'/local/eliscore/lib/data/data_filter.class.php');
 /**
  * Helpers for testing filters
  */
-abstract class filter_testcase extends PHPUnit_Framework_TestCase {
+abstract class filter_testcase extends \PHPUnit\Framework\TestCase {
     /**
      * Equality check for SQL output from filters.
      * @param array $expected List of expected clauses

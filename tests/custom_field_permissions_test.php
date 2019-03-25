@@ -691,7 +691,7 @@ class custom_field_permissions_testcase extends elis_database_test {
             field_owner::TABLE => elis::component_file('elisprogram', 'tests/fixtures/user_field_owner.csv'),
             userset::TABLE     => elis::component_file('elisprogram', 'tests/fixtures/userset.csv')
         ));
-        $dataset = new PHPUnit_Extensions_Database_DataSet_ReplacementDataSet($dataset);
+        $dataset = new \PHPUnit\DbUnit\DataSet\ReplacementDataSet($dataset);
         $dataset->addSubStrReplacement('\n', "\n");
         $this->loadDataSet($dataset);
     }
